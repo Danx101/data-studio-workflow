@@ -1,0 +1,355 @@
+# Himmelblau Executive Summary Dashboard
+# Multi-account, multi-location client — unlike Peneder (one MCC), Himmelblau
+# has one Google Ads account per location (mostly). Brief: "pro Standort die
+# Daten einzeln, möglichst aber auf einer Seite vereint" — one repeated KPI
+# block per location on a single page, not a cross-location blended table.
+# Client explicitly wants phone calls and filled contact forms shown as
+# their own numbers, separate from the account totals, because softconversions
+# (engagement signals like scroll depth / time-on-page / PDF downloads) are
+# now also tracked and would otherwise inflate "Alle Conv.".
+
+client: himmelblau
+report_template: gads-leadgen-v1
+notes: >
+  Built 2026-09-22 from pasted Google Ads Conversions tables for 5 accounts,
+  then corrected 2026-09-22 against "Himmelblau Conversions.xlsx" — the
+  client's own hand-curated list of relevant lead conversions per account.
+  That correction mattered: the first pass had counted both a GADs-native
+  conversion action AND its parallel GA4-linked duplicate as separate real
+  leads for the same underlying event (e.g. "GADs - Kontaktformular" and
+  "... GA4 (web) contact_form" both firing on one form submit), which would
+  have double-counted every lead. conversion_actions.include_in_conversions
+  now follows the xlsx exactly: only GADs-native conversions plus the
+  account's generic default goals ("Lead form - Submit"/"Lead-Formular –
+  senden", "Calls from ads"/"Call clicks from ads") count; every GA4-linked
+  duplicate is excluded.
+  account_id values below are now the confirmed customer IDs from the xlsx
+  header row (Wien's differs by one leading digit from the sheet — used the
+  browser-confirmed "995-267-0917" instead of the sheet's "95-267-0917").
+  OPEN ITEMS before this goes live:
+  - München's account is explicitly labeled "Bestattung Himmelblau München"
+    in the xlsx (not generic "DE" as GA4 events suggested), and the xlsx
+    lists only 5 accounts total — no dedicated Hamburg account. Whether
+    Hamburg campaigns actually live inside this München account (vs. being
+    untracked like St. Pölten/Klosterneuburg) is still unconfirmed — the
+    `campaign_filter` values for muenchen/hamburg below remain PLACEHOLDERS.
+  - St. Pölten & Klosterneuburg (Niederösterreich) have no dedicated
+    account and their GA4 form-fire triggers don't fire at all currently.
+    Per client decision, both are listed as `pending` placeholder blocks
+    ("Tracking wird eingerichtet") rather than folded into another
+    location or omitted silently.
+
+locations:
+  - key: wien
+    label: "Wien"
+    status: tracked
+    data_source: wien
+  - key: graz
+    label: "Graz"
+    status: tracked
+    data_source: graz
+  - key: muenchen
+    label: "München"
+    status: tracked
+    data_source: muenchen_de
+    campaign_filter: { type: contains, value: "München" }   # PLACEHOLDER — verify real campaign names
+    notes: "muenchen_de account's GA4 tag is 'DE', not city-specific — campaign_filter is a guess."
+  - key: hamburg
+    label: "Hamburg"
+    status: tracked
+    data_source: muenchen_de
+    campaign_filter: { type: contains, value: "Hamburg" }   # PLACEHOLDER — verify real campaign names
+    notes: "Assumed to share the muenchen_de account via campaign split — unconfirmed."
+  - key: unvergessen
+    label: "Bestattung Unvergessen"
+    status: tracked
+    data_source: unvergessen
+  - key: furtner
+    label: "Bestattung Furtner"
+    status: tracked
+    data_source: furtner
+  - key: st_poelten
+    label: "St. Pölten"
+    status: pending
+    notes: "No dedicated account; GA4 form-fire tracking not configured yet. Render as placeholder tile."
+  - key: klosterneuburg
+    label: "Klosterneuburg"
+    status: pending
+    notes: "No dedicated account; GA4 form-fire tracking not configured yet. Render as placeholder tile."
+
+data_sources:
+  wien:
+    type: google_ads
+    account_id: "995-267-0917"   # xlsx showed "95-267-0917"; browser-confirmed as 995-267-0917
+    label: "Bestattung Himmelblau"
+  furtner:
+    type: google_ads
+    account_id: "338-081-1411"
+    label: "Bestattung Furtner"
+  muenchen_de:
+    type: google_ads
+    account_id: "730-477-8201"
+    label: "Bestattung Himmelblau München"
+  unvergessen:
+    type: google_ads
+    account_id: "183-205-9800"
+    label: "Bestattung Unvergessenen"
+  graz:
+    type: google_ads
+    account_id: "558-678-6464"
+    label: "Bestattung Himmelblau Graz"
+
+conversion_actions:
+  # ---------------- wien ----------------
+  - { name: "Ladenbesuche", account: wien, status: misconfigured, include_in_conversions: false, source: other }
+  - { name: "Lead form - Submit", account: wien, status: pending, include_in_conversions: true }
+  - { name: "GADs - Kontaktformular", account: wien, ads_category: "Submit lead form", status: enabled, include_in_conversions: true }
+  - { name: "GADs - Vorsorgeformular", account: wien, ads_category: "Submit lead form", status: enabled, include_in_conversions: true }
+  - { name: "Danke AdWords-Conversion (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Anfrage senden allgemein DE (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Anfrage senden Vorsorge EN (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Anfrage senden allgemein EN (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Anfrage senden Vorsorge DE (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Call clicks from ads", account: wien, ads_category: "Phone call leads", status: pending, include_in_conversions: true }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) click_phone", account: wien, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "Anruf über Anzeige", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Click-to-Call", account: wien, ads_category: "Phone call leads", status: enabled, include_in_conversions: true }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) E-Mail Click", account: wien, status: misconfigured, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) contact_form", account: wien, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) contact_form_provision", account: wien, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) click_mail", account: wien, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "GADs - Telefon Klick", account: wien, ads_category: "Phone call leads", status: enabled, include_in_conversions: true }
+  - { name: "GADs - Mail Klick", account: wien, ads_category: "Contact", status: enabled, include_in_conversions: true }
+  - { name: "Anruf (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – Wegbeschreibung", account: wien, status: enabled, include_in_conversions: false, source: local_actions }
+  - { name: "GADs - Routenplaner", account: wien, status: enabled, include_in_conversions: false, source: other }
+  - { name: "Android installs (all other apps)", account: wien, status: pending, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – andere Interaktionen", account: wien, status: enabled, include_in_conversions: false, source: local_actions }
+  - { name: "YouTube channel subscriptions", account: wien, status: pending, include_in_conversions: false, source: other }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) Bestattung-Formular/Kontakt abgeschickt", account: wien, status: misconfigured, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) Vorsorge-Formular/Kontakt abgeschickt", account: wien, status: misconfigured, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) file_download", account: wien, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "GADs - PDF Download", account: wien, status: enabled, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – Websitebesuche", account: wien, status: enabled, include_in_conversions: false, source: local_actions }
+  - { name: "Bestattung Himmelblau Wien - GA4 (web) Anruf Trigger", account: wien, status: misconfigured, include_in_conversions: false, source: ga4_linked }
+  - { name: "Local actions - Menu views", account: wien, status: pending, include_in_conversions: false, source: local_actions }
+  - { name: "GADs - Timer 3min", account: wien, status: enabled, include_in_conversions: false, source: other }
+  - { name: "GADs - Scroll 100", account: wien, status: enabled, include_in_conversions: false, source: other }
+  - { name: "Anfrage Formular anklicken (Alle Website-Daten)", account: wien, status: removed, include_in_conversions: false, source: other }
+  - { name: "YouTube follow-on views", account: wien, status: pending, include_in_conversions: false, source: other }
+
+  # ---------------- furtner ----------------
+  - { name: "GADs - Kontaktformular", account: furtner, status: needs_review, include_in_conversions: true }
+  - { name: "GADs - Telefon Klick", account: furtner, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Mail Klick", account: furtner, status: enabled, include_in_conversions: true }
+  - { name: "Click-to-Call", account: furtner, status: no_recent_activity, include_in_conversions: true }
+  - { name: "Lokale Aktionen – Wegbeschreibung", account: furtner, status: no_recent_activity, include_in_conversions: false, source: local_actions }
+  - { name: "GADs - Google Maps Klick", account: furtner, status: enabled, include_in_conversions: false, source: other }
+  - { name: "GADs - PDF Download", account: furtner, status: needs_review, include_in_conversions: false, source: other }
+  - { name: "Angebot anfordern", account: furtner, status: removed, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – andere Interaktionen", account: furtner, status: no_recent_activity, include_in_conversions: false, source: local_actions }
+  - { name: "Lokale Aktionen – Websitebesuche", account: furtner, status: no_recent_activity, include_in_conversions: false, source: local_actions }
+
+  # ---------------- muenchen_de (München + assumed Hamburg) ----------------
+  - { name: "GADs - Kontaktformular", account: muenchen_de, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Vorsorgeformular", account: muenchen_de, status: enabled, include_in_conversions: true }
+  - { name: "Lead-Formular – senden", account: muenchen_de, status: pending, include_in_conversions: true }
+  - { name: "Calls from ads", account: muenchen_de, ads_category: "Phone call leads", status: enabled, include_in_conversions: true }
+  - { name: "Click-to-Call", account: muenchen_de, status: pending, include_in_conversions: true }
+  - { name: "GADs - Telefon Klick", account: muenchen_de, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Mail Klick", account: muenchen_de, status: enabled, include_in_conversions: true }
+  - { name: "Android installs (all other apps)", account: muenchen_de, status: pending, include_in_conversions: false, source: other }
+  - { name: "Bestattung Himmelblau DE - GA4 (web) contact_form", account: muenchen_de, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "Bestattung Himmelblau DE - GA4 (web) click_mail", account: muenchen_de, status: enabled, include_in_conversions: false, source: ga4_linked }
+
+  # ---------------- unvergessen ----------------
+  - { name: "Lead-Formular – senden", account: unvergessen, status: no_recent_activity, include_in_conversions: true }
+  - { name: "Anfrage gesendet (Alle Website-Daten)", account: unvergessen, status: removed, include_in_conversions: false, source: other }
+  - { name: "Click-to-Call", account: unvergessen, status: enabled, include_in_conversions: true }
+  - { name: "UNVERGESSEN Bestattung – GA4 (web) contact_click_email", account: unvergessen, status: no_recent_activity, include_in_conversions: false, source: ga4_linked }
+  - { name: "UNVERGESSEN Bestattung – GA4 (web) contact_click_phone", account: unvergessen, status: enabled, include_in_conversions: false, source: ga4_linked }
+  - { name: "UNVERGESSEN Bestattung – GA4 (web) contact_form", account: unvergessen, status: no_recent_activity, include_in_conversions: false, source: ga4_linked }
+  - { name: "GADs - Kontaktformular", account: unvergessen, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Telefon Klick", account: unvergessen, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Mail Klick", account: unvergessen, status: needs_review, include_in_conversions: true }
+  - { name: "UNVERGESSEN Bestattung – GA4 (web) page_visit_duration", account: unvergessen, status: enabled, include_in_conversions: false, source: ga4_linked }
+
+  # ---------------- graz ----------------
+  - { name: "GADs - Kontaktformular", account: graz, status: pending, include_in_conversions: true }
+  - { name: "GADs - Vorsorgeformular", account: graz, status: pending, include_in_conversions: true }
+  - { name: "GADs - Telefon Klick", account: graz, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Mail Klick", account: graz, status: pending, include_in_conversions: true }
+  - { name: "Click-to-Call", account: graz, status: enabled, include_in_conversions: true }
+  - { name: "GADs - Maps Klick", account: graz, status: misconfigured, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – Wegbeschreibung", account: graz, status: enabled, include_in_conversions: false, source: local_actions }
+  - { name: "GADs - PDF Download", account: graz, status: enabled, include_in_conversions: false, source: other }
+  - { name: "Lokale Aktionen – andere Interaktionen", account: graz, status: enabled, include_in_conversions: false, source: local_actions }
+  - { name: "Lokale Aktionen – Websitebesuche", account: graz, status: enabled, include_in_conversions: false, source: local_actions }
+
+lead_categories:
+  # Only GADs-native + generic default-goal names now (see notes: at top —
+  # every GA4-linked duplicate event is excluded to avoid double-counting),
+  # so these patterns are deliberately narrow rather than matching every
+  # naming variant seen across accounts.
+  - key: contact_phone
+    label: "Telefonanrufe"
+    group: contact
+    match: { type: regex, pattern: '(?i)(Telefon Klick|Calls from ads|Call clicks from ads|Click-to-Call)' }
+  - key: contact_mail
+    label: "Mail-Kontakte"
+    group: contact
+    match: { type: regex, pattern: '(?i)(Mail Klick)' }
+  - key: contact_form
+    label: "Kontaktformulare"
+    group: form
+    # Anchored on the END so it doesn't also swallow "GADs - Vorsorgeformular".
+    match: { type: regex, pattern: '(?i)(Kontaktformular$|Lead form - Submit|Lead-Formular.*senden)' }
+  - key: contact_form_vorsorge
+    label: "Vorsorgeformulare"
+    group: form
+    match: { type: regex, pattern: '(?i)(Vorsorgeformular$)' }
+  - key: other
+    label: "Sonstige"
+    group: other
+    match: { type: catch_all }
+
+filters:
+  - name: "Conversions Leads"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition:
+      type: regex
+      pattern: '(?i)(Telefon Klick|Calls from ads|Call clicks from ads|Click-to-Call|Mail Klick|Kontaktformular$|Lead form - Submit|Lead-Formular.*senden|Vorsorgeformular$)'
+    derived_from: "all lead_categories except 'other'"
+
+  - name: "Anrufe"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: regex, pattern: '(?i)(Telefon Klick|Calls from ads|Call clicks from ads|Click-to-Call)' }
+    derived_from: "contact_phone"
+
+  - name: "Formulare"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: regex, pattern: '(?i)(Kontaktformular$|Lead form - Submit|Lead-Formular.*senden|Vorsorgeformular$)' }
+    derived_from: "contact_form + contact_form_vorsorge (client asked for calls vs. forms; vorsorge folded into 'forms' at executive-summary level, kept distinguishable via the Anfrage-Kanal calculated field for a detail page later)"
+
+  - name: "Kampagne: München"
+    mode: include
+    field: "Kampagne"
+    condition: { type: contains, value: "München" }
+    derived_from: "location: muenchen — PLACEHOLDER pattern, unverified"
+
+  - name: "Kampagne: Hamburg"
+    mode: include
+    field: "Kampagne"
+    condition: { type: contains, value: "Hamburg" }
+    derived_from: "location: hamburg — PLACEHOLDER pattern, unverified"
+
+calculated_fields:
+  - name: "Anfrage-Kanal"
+    type: case
+    input_field: "Segment Conversion Type Name"
+    cases:
+      - when: { type: regex, pattern: '(?i)(Telefon Klick|Calls from ads|Call clicks from ads|Click-to-Call)' }
+        then: "Telefon"
+      - when: { type: regex, pattern: '(?i)(Mail Klick)' }
+        then: "Mail"
+      - when: { type: regex, pattern: '(?i)(Vorsorgeformular$)' }
+        then: "Vorsorge-Formular"
+      - when: { type: regex, pattern: '(?i)(Kontaktformular$|Lead form - Submit|Lead-Formular.*senden)' }
+        then: "Kontaktformular"
+    default: "Sonstige"
+
+blends:
+  - name: "Wien Summary"
+    location: wien
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: wien, filter: null, fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: wien, filter: "Conversions Leads", fields: ["Leads Conv."] }
+      - { alias: calls, source: wien, filter: "Anrufe", fields: ["Leads Conv."] }
+      - { alias: forms, source: wien, filter: "Formulare", fields: ["Leads Conv."] }
+
+  - name: "Graz Summary"
+    location: graz
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: graz, filter: null, fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: graz, filter: "Conversions Leads", fields: ["Leads Conv."] }
+      - { alias: calls, source: graz, filter: "Anrufe", fields: ["Leads Conv."] }
+      - { alias: forms, source: graz, filter: "Formulare", fields: ["Leads Conv."] }
+
+  - name: "München Summary"
+    location: muenchen
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: muenchen_de, filter: "Kampagne: München", fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: muenchen_de, filter: ["Conversions Leads", "Kampagne: München"], fields: ["Leads Conv."] }
+      - { alias: calls, source: muenchen_de, filter: ["Anrufe", "Kampagne: München"], fields: ["Leads Conv."] }
+      - { alias: forms, source: muenchen_de, filter: ["Formulare", "Kampagne: München"], fields: ["Leads Conv."] }
+
+  - name: "Hamburg Summary"
+    location: hamburg
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: muenchen_de, filter: "Kampagne: Hamburg", fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: muenchen_de, filter: ["Conversions Leads", "Kampagne: Hamburg"], fields: ["Leads Conv."] }
+      - { alias: calls, source: muenchen_de, filter: ["Anrufe", "Kampagne: Hamburg"], fields: ["Leads Conv."] }
+      - { alias: forms, source: muenchen_de, filter: ["Formulare", "Kampagne: Hamburg"], fields: ["Leads Conv."] }
+
+  - name: "Unvergessen Summary"
+    location: unvergessen
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: unvergessen, filter: null, fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: unvergessen, filter: "Conversions Leads", fields: ["Leads Conv."] }
+      - { alias: calls, source: unvergessen, filter: "Anrufe", fields: ["Leads Conv."] }
+      - { alias: forms, source: unvergessen, filter: "Formulare", fields: ["Leads Conv."] }
+
+  - name: "Furtner Summary"
+    location: furtner
+    grain: []
+    join_keys: []
+    legs:
+      - { alias: unfiltered, source: furtner, filter: null, fields: ["Cost (converted)", "Klicks", "Impressionen"] }
+      - { alias: leads, source: furtner, filter: "Conversions Leads", fields: ["Leads Conv."] }
+      - { alias: calls, source: furtner, filter: "Anrufe", fields: ["Leads Conv."] }
+      - { alias: forms, source: furtner, filter: "Formulare", fields: ["Leads Conv."] }
+
+metrics:
+  # Four KPI tiles per tracked location: Kosten, Anrufe, Formulare, Kosten pro Lead.
+  - { name: "Wien - Kosten", location: wien, blend: "Wien Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "Wien - Anrufe", location: wien, blend: "Wien Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "Wien - Formulare", location: wien, blend: "Wien Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "Wien - Kosten pro Lead", location: wien, blend: "Wien Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }
+
+  - { name: "Graz - Kosten", location: graz, blend: "Graz Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "Graz - Anrufe", location: graz, blend: "Graz Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "Graz - Formulare", location: graz, blend: "Graz Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "Graz - Kosten pro Lead", location: graz, blend: "Graz Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }
+
+  - { name: "München - Kosten", location: muenchen, blend: "München Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "München - Anrufe", location: muenchen, blend: "München Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "München - Formulare", location: muenchen, blend: "München Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "München - Kosten pro Lead", location: muenchen, blend: "München Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }
+
+  - { name: "Hamburg - Kosten", location: hamburg, blend: "Hamburg Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "Hamburg - Anrufe", location: hamburg, blend: "Hamburg Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "Hamburg - Formulare", location: hamburg, blend: "Hamburg Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "Hamburg - Kosten pro Lead", location: hamburg, blend: "Hamburg Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }
+
+  - { name: "Unvergessen - Kosten", location: unvergessen, blend: "Unvergessen Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "Unvergessen - Anrufe", location: unvergessen, blend: "Unvergessen Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "Unvergessen - Formulare", location: unvergessen, blend: "Unvergessen Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "Unvergessen - Kosten pro Lead", location: unvergessen, blend: "Unvergessen Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }
+
+  - { name: "Furtner - Kosten", location: furtner, blend: "Furtner Summary", formula: "unfiltered.Cost (converted)", format: currency }
+  - { name: "Furtner - Anrufe", location: furtner, blend: "Furtner Summary", formula: "calls.Leads Conv.", format: number }
+  - { name: "Furtner - Formulare", location: furtner, blend: "Furtner Summary", formula: "forms.Leads Conv.", format: number }
+  - { name: "Furtner - Kosten pro Lead", location: furtner, blend: "Furtner Summary", formula: "unfiltered.Cost (converted) / leads.Leads Conv.", format: currency }

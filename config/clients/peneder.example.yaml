@@ -1,0 +1,356 @@
+# Reference example, reconstructed from a live walkthrough of the existing
+# "Peneder GADs Report" in Looker Studio. Use this to see the schema in
+# action, not as a source of truth for Peneder's actual account — a couple
+# of entries are inferred rather than confirmed (flagged with `# INFERRED`
+# below) and two unused/orphaned blends seen in the live report were left
+# out on purpose (see config/README.md, "data hygiene").
+
+client: peneder
+report_template: gads-leadgen-v1
+notes: >
+  Reconstructed 2026-09-22 from live inspection of the Peneder GADs Report.
+  Verify against Google Ads > Tools & Settings > Conversions before reuse.
+
+data_sources:
+  gads_mcc:
+    type: google_ads_mcc
+    mcc: true
+    label: "Google Ads MCC"
+
+conversion_actions:
+  # --- real lead signals (qualify for "Conversions Leads") ---
+  - name: "Calls from ads"
+    ads_category: "Phone call leads"
+    status: enabled
+    include_in_conversions: true
+  - name: "Clicks to call"
+    ads_category: "Phone call leads"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Telefon Kontakt"
+    ads_category: "Contact"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Mail Kontakt"
+    ads_category: "Contact"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Formular Brandschutz"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Formular Industriebau - Bau"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Formular Allgemein"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Formular Bodendach"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: true
+  - name: "GADs | Formular FIX FM"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: true
+
+  # --- noise: GA4-linked / local actions / not part of the lead funnel ---
+  - name: "Kontaktformular ausgefüllt"
+    ads_category: "Submit lead form"
+    status: enabled
+    include_in_conversions: false
+    source: ga4_linked
+  - name: "Local actions - Website visits"
+    status: enabled
+    include_in_conversions: false
+    source: local_actions
+  - name: "Local actions - Other engagements"
+    status: enabled
+    include_in_conversions: false
+    source: local_actions
+  - name: "Local actions - Directions"
+    status: enabled
+    include_in_conversions: false
+    source: local_actions
+  - name: "www.peneder.com - GA4 conversion"
+    status: enabled
+    include_in_conversions: false
+    source: ga4_linked
+  - name: "Newsletter Anmeldung"
+    ads_category: "Newsletter sign-up"
+    status: enabled
+    include_in_conversions: false
+    source: other
+
+lead_categories:
+  - key: contact_call_click
+    label: "Clicks to call"
+    group: contact
+    match: { type: contains, value: "Clicks to call" }
+  - key: contact_mail
+    label: "Mail Kontakt"
+    group: contact
+    match: { type: contains, value: "Mail" }
+  - key: contact_phone
+    label: "Telefon Kontakt"
+    group: contact
+    # INFERRED: the live filter "Kontakt Telefon" was a 2-clause composite;
+    # this is the most consistent reading given the chart legend, but was
+    # not opened and confirmed directly.
+    match: { type: name_in, values: ["Calls from ads", "GADs | Telefon Kontakt"] }
+  - key: form_brandschutz
+    label: "Formular Brandschutz"
+    group: form
+    match: { type: contains, value: "GADs | Formular Brandschutz" }
+  - key: form_industriebau
+    label: "Formular Industriebau - Bau"
+    group: form
+    match: { type: contains, value: "GADs | Formular Industriebau - Bau" }
+  - key: form_allgemein
+    label: "Formular Allgemein"
+    group: form
+    match: { type: contains, value: "GADs | Formular Allgemein" }
+  - key: form_bodendach
+    label: "Formular Bodendach"
+    group: form
+    match: { type: contains, value: "GADs | Formular Bodendach" }
+  - key: form_fix_fm
+    label: "Formular FIX FM"
+    group: form
+    match: { type: contains, value: "GADs | Formular FIX FM" }
+  - key: other
+    label: "Sonstige"
+    group: other
+    match: { type: catch_all }
+
+filters:
+  - name: "Conversions Leads"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition:
+      type: regex
+      pattern: '(?i)(Calls from ads|Clicks to call|GADs\s*\|\s*(Formular FIX FM|Mail Kontakt|Telefon Kontakt|Formular Brandschutz|Formular Industriebau - Bau|Formular Bodendach|Formular Allgemein))'
+    derived_from: "all lead_categories except 'other'"
+
+  - name: "Anfrageformulare"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: regex, pattern: '(?i)(GADs\s*\|\s*(Formular.*))' }
+    derived_from: "group: form"
+
+  - name: "Anfragen - Mail und Telefon"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition:
+      type: regex
+      pattern: '(?i)(Calls from ads|Clicks to call|GADs\s*\|\s*(Mail Kontakt|Telefon Kontakt))'
+    derived_from: "group: contact"
+
+  - name: "Laufende Kampagne"
+    mode: include
+    field: "Impressionen"
+    condition: { type: threshold, field: "Impressionen", operator: ">", value: 0 }
+
+  - name: "Laufende Anzeigegruppe"
+    mode: include
+    field: "Klicks"
+    condition: { type: threshold, field: "Klicks", operator: ">", value: 0 }
+
+  - name: "Clicks to call"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: contains, value: "Clicks to call" }
+    derived_from: "contact_call_click"
+
+  - name: "Kontakt Mail"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: contains, value: "Mail" }
+    derived_from: "contact_mail"
+
+  - name: "Kontakt Telefon"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: name_in, values: ["Calls from ads", "GADs | Telefon Kontakt"] }
+    derived_from: "contact_phone"
+
+  - name: "GADs | Formular Brandschutz"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: contains, value: "GADs | Formular Brandschutz" }
+    derived_from: "form_brandschutz"
+
+  - name: "GADs | Formular Industriebau - Bau"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: contains, value: "GADs | Formular Industriebau - Bau" }
+    derived_from: "form_industriebau"
+
+  - name: "GADs| Formular Allgemein"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: contains, value: "GADs| Formular Allgemein" }
+    derived_from: "form_allgemein"
+
+  - name: "Kontakt - Sonstige"
+    mode: exclude
+    field: "Anfrage - Kontakt"
+    condition: { type: contains, value: "Sonstige" }
+    derived_from: "calculated_fields: Anfrage - Kontakt"
+
+  - name: "Formulare - Sonstige"
+    mode: exclude
+    field: "Anfrage-Formular"
+    condition: { type: contains, value: "Sonstige" }
+    derived_from: "calculated_fields: Anfrage-Formular"
+
+  - name: "Newsletter ausschließen"
+    mode: exclude
+    field: "Anfrage-Formular"
+    condition: { type: contains, value: "Newsletter" }
+
+calculated_fields:
+  - name: "Anfrage - Kontakt"
+    type: case
+    input_field: "Segment Conversion Type Name"
+    cases:
+      - when: { type: name_in, values: ["Calls from ads", "GADs | Telefon Kontakt"] }
+        then: "Telefon Kontakt"
+      - when: { type: contains, value: "Mail" }
+        then: "Mail Kontakt"
+      - when: { type: contains, value: "Clicks to call" }
+        then: "Clicks to call"
+    default: "Sonstige"
+
+  - name: "Anfrage-Formular"
+    type: case
+    input_field: "Segment Conversion Type Name"
+    cases:
+      - when: { type: contains, value: "Formular Brandschutz" }
+        then: "Formular Brandschutz"
+      - when: { type: contains, value: "Formular Industriebau - Bau" }
+        then: "Formular Industriebau - Bau"
+      - when: { type: contains, value: "Formular Allgemein" }
+        then: "Formular Allgemein"
+      - when: { type: contains, value: "Formular Bodendach" }
+        then: "Formular Bodendach"
+      - when: { type: contains, value: "Formular FIX FM" }
+        then: "Formular FIX FM"
+      - when: { type: contains, value: "Newsletter" }
+        then: "Newsletter"
+    default: "Sonstige"
+
+# NOTE: the live report also had two blends with "0 Diagramme" (unused,
+# orphaned) — "Zusammengeführte Daten (1)" and a leftover line-chart blend.
+# They're intentionally not reproduced here; see config/README.md.
+blends:
+  - name: "Leads Kampagnen Performance"
+    grain: ["Kampagne"]
+    join_keys: ["Kampagne"]
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Kampagne", "Cost (converted)", "Klicks", "Impressionen", "Avg. CPC (converted)", "CTR"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Kampagne", "Leads Conv."]
+
+  - name: "Leads Asset Group Performance"
+    grain: ["Asset Group Name"]
+    join_keys: ["Asset Group Name"]
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Asset Group Name", "Cost (converted)", "Klicks", "Impressionen"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Asset Group Name", "Leads Conv."]
+
+  - name: "Leads Regions"
+    grain: ["Land/Gebiet"]
+    join_keys: ["Land/Gebiet"]
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Land/Gebiet", "Cost (converted)", "Klicks"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Land/Gebiet", "Leads Conv."]
+
+  - name: "Costs per Lead"
+    grain: []
+    join_keys: []
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Cost (converted)"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Leads Conv."]
+
+  - name: "Costs per Lead - Tag"
+    grain: ["Tag"]
+    join_keys: ["Tag"]
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Tag", "Cost (converted)"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Tag", "Leads Conv."]
+
+  - name: "Conversion Rate Leads"
+    grain: []
+    join_keys: []
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Klicks"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Leads Conv."]
+
+  - name: "Conversion Rate Leads - Tag"
+    grain: ["Tag"]
+    join_keys: ["Tag"]
+    legs:
+      - alias: unfiltered
+        source: gads_mcc
+        filter: null
+        fields: ["Tag", "Klicks"]
+      - alias: leads
+        source: gads_mcc
+        filter: "Conversions Leads"
+        fields: ["Tag", "Leads Conv."]
+
+metrics:
+  - name: "Cost per Lead"
+    blend: "Costs per Lead"
+    formula: "unfiltered.Cost (converted) / leads.Leads Conv."
+    format: currency
+  - name: "Cost per Lead - Tag"
+    blend: "Costs per Lead - Tag"
+    formula: "unfiltered.Cost (converted) / leads.Leads Conv."
+    format: currency
+  - name: "Conversion Rate Leads"
+    blend: "Conversion Rate Leads"
+    formula: "leads.Leads Conv. / unfiltered.Klicks"
+    format: percent
+  - name: "Conversion Rate Leads - Tag"
+    blend: "Conversion Rate Leads - Tag"
+    formula: "leads.Leads Conv. / unfiltered.Klicks"
+    format: percent

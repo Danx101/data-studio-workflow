@@ -1,0 +1,64 @@
+# New client onboarding template.
+# 1. Copy this file to clients/<client-slug>.yaml
+# 2. Fill conversion_actions from Google Ads > Tools & Settings > Conversions
+#    for this account (not from Looker Studio's Conversion dimension picker
+#    — see config/README.md for why).
+# 3. Group them into lead_categories.
+# 4. filters / calculated_fields are usually mechanical once lead_categories
+#    is right — see peneder.example.yaml for the generation pattern.
+# 5. Fill blends/metrics matching the grains your template report needs.
+# 6. Validate against config/schema/dashboard-config.schema.json.
+
+client: "<client-slug>"
+report_template: "gads-leadgen-v1"
+notes: ""
+
+data_sources:
+  gads_mcc:
+    type: google_ads_mcc          # or google_ads if single-account
+    mcc: true
+    label: "Google Ads MCC"
+
+conversion_actions:
+  # One entry per row in Google Ads > Tools & Settings > Conversions.
+  # Set include_in_conversions: false and source: ga4_linked / local_actions
+  # / other for anything that is noise, not a real lead signal.
+  - name: ""
+    ads_category: ""
+    status: enabled              # enabled | paused | removed
+    include_in_conversions: true
+
+lead_categories:
+  # Every conversion_actions entry you *do* want counted as a lead should
+  # match exactly one category here (besides the required catch-all below).
+  # match types: name_in (values: [...]) | contains (value: "...")
+  #            | regex (pattern: "...") | threshold (field/operator/value)
+  #            | catch_all (no params)
+  - key: other
+    label: "Sonstige"
+    group: other
+    match: { type: catch_all }
+
+filters:
+  # At minimum: one master include-regex covering every non-'other'
+  # category (name it "Conversions Leads" to match the template's charts),
+  # plus one include filter per category you want its own chart/column for.
+  - name: "Conversions Leads"
+    mode: include
+    field: "Segment Conversion Type Name"
+    condition: { type: regex, pattern: "" }
+    derived_from: "all lead_categories except 'other'"
+
+calculated_fields: []
+  # CASE-bucket fields (e.g. "Anfrage - Kontakt", "Anfrage-Formular") if
+  # the template groups categories into a couple of summary dimensions.
+
+blends: []
+  # One per grain the template needs (campaign, date, region, asset group,
+  # totals). Each blend = one unfiltered leg + one leg filtered by
+  # "Conversions Leads" (or a narrower category filter), joined on the
+  # shared dimension(s).
+
+metrics: []
+  # Ratios computed across a blend's legs, e.g. cost per lead,
+  # conversion rate on leads.

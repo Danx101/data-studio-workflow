@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jev-ui-agent/config/dashboard-config.schema.json",
+  "title": "Dashboard Config",
+  "description": "Per-client config describing conversion taxonomy, filters, calculated fields, blends and metrics for a Looker Studio lead-gen report. Generated from a Google Ads account's Conversions settings, not scraped from Looker Studio.",
+  "type": "object",
+  "required": ["client", "report_template", "data_sources", "conversion_actions", "lead_categories", "filters", "calculated_fields", "blends", "metrics"],
+  "additionalProperties": false,
+  "properties": {
+    "client": { "type": "string", "description": "Short client/account slug, e.g. 'peneder'." },
+    "report_template": { "type": "string", "description": "Name of the Looker Studio template report this config is meant to be applied to, e.g. 'gads-leadgen-v1'." },
+    "notes": { "type": "string", "description": "Freeform notes for whoever configures this client next." },
+
+    "locations": {
+      "type": "array",
+      "description": "Optional: for multi-location/multi-account clients (one Google Ads account per location, or several locations sharing one account via campaigns). Drives one repeated report block per location. Omit entirely for single-location clients like Peneder.",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "label": { "type": "string", "description": "Display label, e.g. 'Wien'." },
+          "status": { "type": "string", "enum": ["tracked", "pending"], "description": "'pending' = no data source and/or tracking not firing yet; render as a placeholder block instead of real numbers." },
+          "data_source": { "type": "string", "description": "Key into data_sources. Omit when status is 'pending'." },
+          "campaign_filter": { "$ref": "#/$defs/matchRule", "description": "If this location shares a data_source with others (e.g. two cities in one account), the match rule that isolates this location's campaigns within that source." },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+
+    "data_sources": {
+      "type": "object",
+      "description": "Keys are local source aliases referenced elsewhere in this file (e.g. by filters.field's implicit source, or blends.legs.source).",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "enum": ["google_ads", "google_ads_mcc", "ga4", "sheets"] },
+          "account_id": { "type": "string" },
+          "mcc": { "type": "boolean", "default": false },
+          "label": { "type": "string", "description": "Human label matching the Looker Studio data source name, e.g. 'Google Ads MCC'." }
+        }
+      }
+    },
+
+    "conversion_actions": {
+      "type": "array",
+      "description": "Raw inventory pulled from Google Ads → Tools & Settings → Conversions for this account. This is the ground truth; lead_categories below classify these.",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "description": "Exact conversion action name as shown in Google Ads." },
+          "account": { "type": "string", "description": "Key into data_sources this action belongs to. Required when data_sources has more than one entry (multi-account clients); omit for single-account clients." },
+          "ads_category": { "type": "string", "description": "Google Ads' own category, e.g. 'Submit lead form', 'Phone call leads', 'Contact'." },
+          "status": {
+            "type": "string",
+            "enum": ["enabled", "paused", "removed", "pending", "misconfigured", "needs_review", "no_recent_activity"],
+            "description": "Mirrors Google Ads' own Tracking-Status column (Aktiv=enabled, Entfernt=removed, Warten auf Conversions=pending, Falsch konfiguriert=misconfigured, Überprüfung erforderlich=needs_review, Keine kürzlich erfassten Conversions=no_recent_activity)."
+          },
+          "include_in_conversions": { "type": "boolean", "default": true, "description": "Google Ads' 'Include in Conversions' flag." },
+          "source": { "type": "string", "enum": ["google_ads", "ga4_linked", "local_actions", "other"], "default": "google_ads", "description": "Flags noise imported from GA4/local actions so it can be excluded from lead_categories entirely." }
+        }
+      }
+    },
+
+    "lead_categories": {
+      "type": "array",
+      "description": "Buckets that group conversion_actions into meaningful lead types. One category should be a catch_all named 'other' to surface anything unclassified instead of silently dropping it.",
+      "items": {
+        "type": "object",
+        "required": ["key", "label", "match"],
+        "additionalProperties": false,
+        "properties": {
+          "key": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Stable machine key, e.g. 'contact_phone'." },
+          "label": { "type": "string", "description": "Display label used in filter/field names, e.g. 'Kontakt Telefon'." },
+          "group": { "type": "string", "enum": ["contact", "form", "other"], "description": "Top-level grouping used to build the two summary buckets (Anfrage-Kontakt / Anfrage-Formular)." },
+          "match": { "$ref": "#/$defs/matchRule" }
+        }
+      }
+    },
+
+    "filters": {
+      "type": "array",
+      "description": "Named, reusable filters — mirrors Looker Studio's Resource > Manage Filters list. Usually generated 1:1 from lead_categories plus one master filter and any exclude/'Sonstige' filters.",
+      "items": {
+        "type": "object",
+        "required": ["name", "mode", "field", "condition"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "mode": { "type": "string", "enum": ["include", "exclude"] },
+          "field": { "type": "string", "description": "Field the condition applies to, e.g. 'Segment Conversion Type Name' or a calculated_fields name." },
+          "condition": { "$ref": "#/$defs/matchRule" },
+          "derived_from": { "type": "string", "description": "Optional: which lead_categories key(s) this filter was generated from, for traceability." }
+        }
+      }
+    },
+
+    "calculated_fields": {
+      "type": "array",
+      "description": "CASE-style bucket fields built from lead_categories, e.g. 'Anfrage-Kontakt', 'Anfrage-Formular'.",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "input_field", "cases", "default"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["case"] },
+          "input_field": { "type": "string" },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["when", "then"],
+              "additionalProperties": false,
+              "properties": {
+                "when": { "$ref": "#/$defs/matchRule" },
+                "then": { "type": "string" }
+              }
+            }
+          },
+          "default": { "type": "string", "description": "Value for anything not matched by cases — typically 'Sonstige'." }
+        }
+      }
+    },
+
+    "blends": {
+      "type": "array",
+      "description": "Each blend joins the same source against itself at one grain: one unfiltered leg (for cost/clicks/impressions) and one lead-filtered leg (for lead counts), so ratio metrics can be computed across both.",
+      "items": {
+        "type": "object",
+        "required": ["name", "grain", "legs", "join_keys"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "location": { "type": "string", "description": "Key into locations, when this blend is scoped to one location (multi-location clients)." },
+          "grain": { "type": "array", "items": { "type": "string" }, "description": "Dimensions this blend is aggregated to, e.g. ['Kampagne'] or ['Tag']." },
+          "legs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["alias", "source", "fields"],
+              "additionalProperties": false,
+              "properties": {
+                "alias": { "type": "string" },
+                "source": { "type": "string", "description": "Key into data_sources." },
+                "filter": {
+                  "oneOf": [
+                    { "type": "null" },
+                    { "type": "string" },
+                    { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+                  ],
+                  "description": "Name of a filters entry applied to this leg, null for unfiltered, or an array of filter names AND-combined (e.g. a channel filter plus a location's campaign_filter when several locations share one data source)."
+                },
+                "fields": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              }
+            }
+          },
+          "join_keys": { "type": "array", "items": { "type": "string" }, "description": "Empty for a totals-level blend with no grain to join on." }
+        }
+      }
+    },
+
+    "metrics": {
+      "type": "array",
+      "description": "Derived metrics computed across a blend's legs, e.g. Cost per Lead = unfiltered.Cost / leads.Leads Conv.",
+      "items": {
+        "type": "object",
+        "required": ["name", "blend", "formula"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "location": { "type": "string", "description": "Key into locations, when this metric is scoped to one location." },
+          "blend": { "type": "string", "description": "Name of the blends entry this metric is computed on." },
+          "formula": { "type": "string", "description": "Expression referencing '<leg alias>.<field>', e.g. 'unfiltered.Cost / leads.Leads Conv.'." },
+          "format": { "type": "string", "enum": ["currency", "percent", "number"], "default": "number" }
+        }
+      }
+    }
+  },
+
+  "$defs": {
+    "matchRule": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["type", "values"],
+          "properties": {
+            "type": { "const": "name_in" },
+            "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "const": "contains" },
+            "value": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["type", "pattern"],
+          "properties": {
+            "type": { "const": "regex" },
+            "pattern": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["type", "field", "operator", "value"],
+          "properties": {
+            "type": { "const": "threshold" },
+            "field": { "type": "string" },
+            "operator": { "type": "string", "enum": [">", ">=", "<", "<=", "=="] },
+            "value": { "type": "number" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "required": ["type"],
+          "properties": {
+            "type": { "const": "catch_all" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
